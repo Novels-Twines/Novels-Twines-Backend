@@ -1,65 +1,81 @@
 # Novels-Twines Backend
 
-Node.js + Express + TypeScript API foundation for the Novels-Twines website.
+Node.js + Express + TypeScript API for Novels-Twines. Supabase Auth manages user sign-in; this API verifies Supabase access tokens and stores application roles and creator-approval state in PostgreSQL through Prisma.
 
-## Current status
+## Implemented
 
-This first foundation stage provides:
-- Express application with Helmet security headers.
-- CORS allow-list configuration through `CORS_ORIGIN`.
-- JSON request-size limit and consistent 404/error responses.
+- Helmet security headers, CORS allow-list, request-size limit, and consistent JSON errors.
 - Health endpoint: `GET /api/health`.
-- PostgreSQL Prisma schema for users and server-side sessions.
-- Role model: new users default to `READER`; `CREATOR` and `ADMIN` are privileged roles.
-- Creator application status for an approval workflow.
-- Basic automated API tests and TypeScript type checking.
+- Supabase access-token verification on protected endpoints.
+- User profile synchronization from the verified Supabase identity. New application profiles always receive the `READER` role.
+- `GET /api/auth/me` returns the signed-in user's application profile.
+- `POST /api/creator/applications` submits a Reader's creator application.
+- Admin-only `GET /api/admin/creator-applications` lists pending applications.
+- Admin-only `PATCH /api/admin/creator-applications/:userId` accepts `{"decision":"approve"}` or `{"decision":"reject"}`.
+- Role and creator-application status are stored separately from Supabase's authentication identity.
 
-**Authentication is not implemented yet.** There are no registration, login, logout, password-reset, session-creation, or publishing endpoints in this foundation. Do not treat this API as production-ready.
+## Important security boundaries
+
+- Public registration and sign-in are handled by Supabase Auth. The browser must use only the Supabase project URL and publishable/anon key.
+- The Supabase service-role key is server-only. Never place it in the website repository, browser JavaScript, or public GitHub Pages configuration.
+- Clients cannot choose or update their own application role. New profiles are always Readers.
+- Admins must be provisioned manually by an authorized operator in the database. There is no public endpoint to create or promote an Admin.
+- Only Admins can approve creator applications. Approval changes the application role to `CREATOR`; rejection leaves the account as `READER`.
+- Creator application approval does not yet publish story content. Content publishing and GitHub integration are separate future work.
+- Configure Supabase Auth email confirmation, redirect URLs, password policies, and rate limits in the Supabase project before production use.
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
-- PostgreSQL 14 or newer (for database setup)
+- PostgreSQL 14 or newer (Supabase Postgres is suitable)
+- A Supabase project with Auth enabled
 
 ## Local setup
 
 1. Install dependencies: `npm install`.
-2. Copy `.env.example` to `.env` and update `DATABASE_URL` for your local PostgreSQL database.
-3. Generate Prisma Client: `npm run db:generate`.
-4. Create/apply the initial migration: `npm run db:migrate -- --name init`.
-5. Start the development server: `npm run dev`.
+2. Copy `.env.example` to `.env`.
+3. Set `DATABASE_URL` to the PostgreSQL connection string.
+4. Set `SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY`.
+5. Set `CORS_ORIGIN` to the exact website origin(s).
+6. Generate Prisma Client: `npm run db:generate`.
+7. Create/apply the database migration: `npm run db:migrate -- --name supabase-auth-profiles`.
+8. Start the development server: `npm run dev`.
 
 The API runs at `http://localhost:4000` by default.
+
+## API overview
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/health` | Public | API process health |
+| GET | `/api/auth/me` | Signed-in user | Return application profile |
+| POST | `/api/creator/applications` | Reader | Apply to become a Creator |
+| GET | `/api/admin/creator-applications` | Admin | List pending applications |
+| PATCH | `/api/admin/creator-applications/:userId` | Admin | Approve or reject an application |
+
+Protected endpoints expect `Authorization: Bearer <supabase-access-token>`.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start development server with reload |
-| `npm run build` | Compile TypeScript into `dist/` |
-| `npm start` | Run compiled server |
+| `npm run dev` | Start the development server |
+| `npm run build` | Compile TypeScript |
 | `npm run typecheck` | Check TypeScript types |
 | `npm test` | Run API tests |
 | `npm run db:generate` | Generate Prisma Client |
-| `npm run db:migrate` | Run local development migrations |
+| `npm run db:migrate` | Apply a local development migration |
 | `npm run db:studio` | Open Prisma Studio |
 
-## Environment variables
+## Current limitations
 
-See `.env.example`. Real `.env` files, database passwords, session secrets, API keys, and GitHub App credentials must never be committed. Production secrets belong in the backend hosting provider's secret manager.
+- The website sign-in/register interface has not yet been connected to Supabase.
+- Supabase project configuration and database migration must be completed before protected endpoints can work.
+- Creator applications are stored in the application database; there is no email notification or moderation dashboard yet.
+- Story submission, review queues, publication records, and controlled Content-repository publishing are not implemented.
+- The health endpoint reports API process health only; it does not verify Supabase or database connectivity.
 
-## Planned next stages
+## Environment and secrets
 
-1. Authentication: open Reader registration, login/logout, Argon2id password hashing, secure HTTP-only cookies, and server-side session lifecycle.
-2. Authorization: role checks and Admin-only Creator approval.
-3. Content workflow: draft submission, Admin approval, and controlled publishing integration with the separate content repository.
-4. Security and operations: rate limits, CSRF protection appropriate to cookie sessions, audit logs, CI migrations, and deployment configuration.
-
-## Security notes
-
-- Public registration must always assign `READER` on the server; clients must never choose their own role.
-- Admin accounts must be provisioned through a controlled process, not public signup.
-- Creator permissions must be granted only after Admin approval.
-- Session tokens should be random, stored only as hashes, and delivered in secure, HTTP-only, same-site cookies when authentication is implemented.
-- The health endpoint reports API process health only; it does not verify database connectivity.
+See `.env.example`. Never commit real environment files, database passwords, Supabase service-role keys, access tokens, or GitHub App credentials. Production secrets belong in the backend hosting provider's secret manager.
