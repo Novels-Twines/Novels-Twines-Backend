@@ -36,8 +36,8 @@ export async function authenticate(request: Request, response: Response, next: N
     }
 
     const email = data.user.email;
-    if (!email) {
-      sendAuthError(response, 403, "EMAIL_REQUIRED", "A verified email account is required.");
+    if (!email || !data.user.email_confirmed_at) {
+      sendAuthError(response, 403, "EMAIL_VERIFICATION_REQUIRED", "Confirm your email address before using Novels-Twines.");
       return;
     }
 
@@ -46,9 +46,7 @@ export async function authenticate(request: Request, response: Response, next: N
       create: {
         supabaseUserId: data.user.id,
         email,
-        emailVerifiedAt: data.user.email_confirmed_at
-          ? new Date(data.user.email_confirmed_at)
-          : null,
+        emailVerifiedAt: new Date(data.user.email_confirmed_at),
       },
       update: {
         email,
