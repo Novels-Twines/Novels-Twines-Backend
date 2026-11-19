@@ -16,6 +16,14 @@ router.get("/creator-applications", authenticate, requireRole(UserRole.ADMIN), a
 });
 
 router.patch("/creator-applications/:userId", authenticate, requireRole(UserRole.ADMIN), async (request, response) => {
+  const userId = Array.isArray(request.params.userId) ? request.params.userId[0] : request.params.userId;
+  if (!userId) {
+    response.status(400).json({
+      error: { code: "INVALID_USER_ID", message: "A valid user ID is required." },
+    });
+    return;
+  }
+
   const decision = request.body?.decision;
   if (decision !== "approve" && decision !== "reject") {
     response.status(400).json({
@@ -26,7 +34,7 @@ router.patch("/creator-applications/:userId", authenticate, requireRole(UserRole
 
   const updated = await prisma.user.updateMany({
     where: {
-      id: request.params.userId,
+      id: userId,
       creatorApplicationStatus: CreatorApplicationStatus.PENDING,
     },
     data: {
@@ -44,7 +52,7 @@ router.patch("/creator-applications/:userId", authenticate, requireRole(UserRole
   }
 
   const account = await prisma.user.findUniqueOrThrow({
-    where: { id: request.params.userId },
+    where: { id: userId },
     select: { id: true, email: true, role: true, creatorApplicationStatus: true },
   });
 
