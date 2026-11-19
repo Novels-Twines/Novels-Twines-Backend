@@ -1,6 +1,9 @@
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
 import helmet from "helmet";
+import adminRoutes from "./routes/admin";
+import authRoutes from "./routes/auth";
+import creatorRoutes from "./routes/creator";
 
 const app = express();
 
@@ -31,6 +34,10 @@ app.get("/api/health", (_request, response) => {
     service: "novels-twines-api",
   });
 });
+
+app.use("/api/auth", authRoutes);
+app.use("/api/creator", creatorRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((_request, response) => {
   response.status(404).json({
